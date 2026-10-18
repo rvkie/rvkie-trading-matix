@@ -132,6 +132,93 @@ body {
   height: 100%;
 }
 
+/* ---------- Panel robot ---------- */
+.panel-robot {
+  padding: 12px 16px;
+  background: #1a2236;
+  border-top: 1px solid #242e45;
+}
+
+.baris-robot-atas {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.robot-kiri {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.status-robot {
+  font-size: 13px;
+  font-weight: bold;
+  padding: 4px 12px;
+  border-radius: 12px;
+}
+
+.status-robot.mati { background: #242e45; color: #9aa4b8; }
+.status-robot.hidup { background: rgba(46, 189, 133, 0.2); color: #2ebd85; }
+.status-robot.berhenti { background: rgba(246, 70, 93, 0.2); color: #f6465d; }
+
+.tombol-robot {
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: bold;
+  background: #2ebd85;
+  color: #0f1420;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.tombol-robot.matikan {
+  background: #f6465d;
+  color: #ffffff;
+}
+
+/* Baris pengaturan robot */
+.robot-atur {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.grup-atur {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kotak-isi {
+  width: 100%;
+  padding: 10px 8px;
+  font-size: 14px;
+  background: #131927;
+  color: #e8ecf4;
+  border: 1px solid #242e45;
+  border-radius: 6px;
+}
+
+.kotak-isi:disabled {
+  color: #5a6478;
+  background: #171e2e;
+}
+
+.info-robot {
+  margin: 0;
+  font-size: 12px;
+  color: #9aa4b8;
+  line-height: 1.5;
+}
+
+.info-robot.menang { color: #2ebd85; }
+.info-robot.kalah  { color: #f6465d; }
+
 /* ---------- Panel kontrol ---------- */
 .panel-kontrol {
   padding: 12px 16px;
