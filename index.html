@@ -4,35 +4,42 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RTM — Rvkie Trading Matix</title>
-  <style>
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background: #0f1420;
-      color: #e8ecf4;
-      font-family: Arial, sans-serif;
-      text-align: center;
-      padding: 16px;
-    }
-    h1 { font-size: 26px; margin: 0 0 10px; }
-    p  { color: #9aa4b8; }
-    .disclaimer {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      padding: 10px;
-      background: #171e2e;
-      color: #f0b35e;
-      font-size: 13px;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>RTM (Rvkie Trading Matix)</h1>
-  <p>Persiapan berhasil — grafik akan muncul di Tahap 2.</p>
-  <div class="disclaimer">Simulasi edukasi, bukan nasihat keuangan.</div>
+
+  <!-- ============ KEPALA APLIKASI ============ -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-nama">RTM</span>
+      <span class="brand-sub">Rvkie Trading Matix</span>
+    </div>
+    <div class="aset">
+      <span class="aset-pasangan">BTC / USD</span>
+      <span id="harga-sekarang" class="aset-harga">—</span>
+      <span id="status-koneksi" class="status status-muat">memuat…</span>
+    </div>
+  </header>
+
+  <!-- ============ GRAFIK ============ -->
+  <main class="area-grafik">
+    <div class="toolbar">
+      <button id="tf-1m" class="tombol-tf aktif" type="button">1m</button>
+      <button id="tf-5m" class="tombol-tf" type="button">5m</button>
+    </div>
+    <div class="kotak-grafik">
+      <canvas id="grafik"></canvas>
+    </div>
+  </main>
+
+  <!-- ============ PANEL KONTROL (ISI MENYUSUL TAHAP 3) ============ -->
+  <section class="panel-kontrol">
+    <p class="teks-halus">Panel kontrol (tombol Naik/Turun) menyusul di Tahap 3.</p>
+  </section>
+
+  <!-- ============ DISCLAIMER ============ -->
+  <footer class="disclaimer">Simulasi edukasi, bukan nasihat keuangan.</footer>
+
+  <script src="app.js"></script>
 </body>
 </html>
