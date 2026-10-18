@@ -49,6 +49,10 @@
         <input id="atur-nominal" class="kotak-isi" type="number" min="10" step="10" value="50">
       </div>
       <div class="grup-atur">
+        <label class="label-halus" for="atur-interval">Interval (detik)</label>
+        <input id="atur-interval" class="kotak-isi" type="number" min="10" step="10" value="60">
+      </div>
+      <div class="grup-atur">
         <label class="label-halus" for="atur-rugi">Batas rugi/hari</label>
         <input id="atur-rugi" class="kotak-isi" type="number" min="50" step="50" value="500">
       </div>
@@ -58,7 +62,7 @@
       </div>
     </div>
 
-    <p id="info-robot" class="info-robot">Robot mati. Atur nominal, batas rugi, dan batas transaksi, lalu tekan HIDUPKAN.</p>
+    <p id="info-robot" class="info-robot">Robot mati. Tiap interval robot buka 1 posisi, arah mengikuti indikator. Atur lalu tekan HIDUPKAN.</p>
   </section>
 
   <!-- ============ PANEL KONTROL MANUAL ============ -->
