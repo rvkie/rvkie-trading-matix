@@ -1,14 +1,19 @@
 /* ============================================================
    RTM (Rvkie Trading Matix) — Otak aplikasi
    Tahap 2: grafik candlestick realtime (Coinbase -> Binance -> simulasi)
-   Tahap 3: saldo virtual 10.000 + tombol Naik/Turun + nominal & durasi
+   Tahap 3: saldo virtual + tombol Naik/Turun manual
+   Tahap 4: robot otomatis ON/OFF dengan persilangan moving average
    ------------------------------------------------------------
    Untuk pemula:
-   - "Candle" = satu batang grafik (harga buka, tertinggi,
-     terendah, tutup dalam satu periode).
-   - "Transaksi" = kamu memilih arah (Naik/Turun), nominal, dan
-     durasi; saat durasi habis, harga akhir dibandingkan dengan
-     harga awal untuk menentukan menang/kalah.
+   - "Candle" = satu batang grafik (harga buka/tinggi/rendah/tutup
+     dalam satu periode).
+   - "Moving average (MA)" = garis rata-rata harga sejumlah candle
+     terakhir. MA cepat (9 candle) lebih reaktif; MA lambat (21
+     candle) mewakili tren besar.
+   - Strategi robot: MA cepat memotong ke ATAS garis lambat ->
+     pasang NAIK; memotong ke BAWAH -> pasang TURUN.
+   - Robot punya rem pengaman: batas rugi harian dan batas jumlah
+     transaksi. Kalau tercapai, robot berhenti sendiri.
    - Mode demo penuh: saldo hanyalah angka di layar, bukan uang.
    ============================================================ */
 
@@ -21,7 +26,11 @@ var CONFIG = {
   timeframe: 60,            // 60 = 1 menit, 300 = 5 menit (detik)
 
   saldoAwal: 10000,         // saldo demo awal
-  persenMenang: 0.8         // menang = +80% dari nominal
+  persenMenang: 0.8,        // menang = +80% dari nominal
+
+  maCepat: 9,               // panjang garis rata-rata cepat (candle)
+  maLambat: 21,             // panjang garis rata-rata lambat (candle)
+  durasiRobot: 60           // durasi transaksi robot (detik)
 };
 
 // Daftar sumber data, dicoba berurutan sampai ada yang berhasil
@@ -31,7 +40,6 @@ var SUMBER = [
     urlCandle: function (tf) {
       return "https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=" + tf;
     },
-    // Jawaban Coinbase: [waktu, terendah, tertinggi, buka, tutup, volume]
     uraikanCandle: function (mentah) {
       return mentah.map(function (b) {
         return { waktu: b[0], buka: b[3], tinggi: b[2], rendah: b[1], tutup: b[4] };
@@ -50,7 +58,6 @@ var SUMBER = [
       var kode = tf === 300 ? "5m" : "1m";
       return "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=" + kode + "&limit=" + CONFIG.jumlahCandle;
     },
-    // Jawaban Binance: [waktu(ms), buka, tinggi, rendah, tutup, ...]
     uraikanCandle: function (mentah) {
       return mentah.map(function (b) {
         return {
@@ -74,18 +81,28 @@ var SUMBER = [
 
 /* ================= KEADAAN APLIKASI ================= */
 
-var candles = [];            // daftar candle yang ditampilkan
-var hargaTerakhir = null;    // harga pasar terbaru
-var sumberAktif = null;      // objek sumber yang sedang dipakai
-var modeSimulasi = false;    // true jika semua sumber gagal
-var hargaSimulasi = 81000;   // titik awal harga simulasi
-var pewaktu = null;          // penanda interval pembaruan harga
+var candles = [];
+var hargaTerakhir = null;
+var sumberAktif = null;
+var modeSimulasi = false;
+var hargaSimulasi = 81000;
+var pewaktu = null;
 
-var saldo = CONFIG.saldoAwal;   // saldo demo
-var nominal = 50;               // nominal taruhan terpilih
-var durasi = 60;                // durasi transaksi terpilih (detik)
-var transaksiJalan = null;      // transaksi aktif, null jika tidak ada
-var pewaktuHitungMundur = null; // penanda interval hitung mundur
+var saldo = CONFIG.saldoAwal;
+var nominal = 50;
+var durasi = 60;
+var transaksiJalan = null;      // satu transaksi aktif (manual atau robot)
+var pewaktuHitungMundur = null;
+
+// Keadaan robot
+var robotHidup = false;
+var robotNominal = 50;
+var robotBatasRugi = 500;       // total rugi maksimal dalam satu hari
+var robotBatasTransaksi = 10;   // jumlah transaksi maksimal robot
+var robotRugiHariIni = 0;       // akumulasi rugi hari ini
+var robotTransaksiHariIni = 0;  // jumlah transaksi robot hari ini
+var robotTanggal = tanggalHariIni(); // penanda tanggal, untuk reset harian
+var sinyalTerakhir = null;      // "naik" / "turun" / null
 
 
 /* ================= ALAT BANTU ================= */
@@ -94,7 +111,6 @@ function el(id) {
   return document.getElementById(id);
 }
 
-// 81164.5 -> "81,164.50"
 function formatHarga(angka) {
   return angka.toLocaleString("en-US", {
     minimumFractionDigits: 2,
@@ -102,7 +118,6 @@ function formatHarga(angka) {
   });
 }
 
-// 10000 -> "10,000"
 function formatSaldo(angka) {
   return angka.toLocaleString("en-US", { maximumFractionDigits: 0 });
 }
@@ -111,6 +126,11 @@ function setStatus(teks, kelas) {
   var s = el("status-koneksi");
   s.textContent = teks;
   s.className = "status " + kelas;
+}
+
+function tanggalHariIni() {
+  var d = new Date();
+  return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
 }
 
 
@@ -137,6 +157,7 @@ function ambilCandleAwal(nomorSumber) {
       modeSimulasi = false;
       hargaTerakhir = daftar[daftar.length - 1].tutup;
       setStatus(sumber.nama + " • live", "status-live");
+      sinyalTerakhir = null;          // hitung ulang sinyal dari awal
       gambarGrafik();
       mulaiPembaruan();
     })
@@ -162,6 +183,7 @@ function perbaruiHarga() {
       setStatus(sumberAktif.nama + " • live", "status-live");
       tanamHargaKeCandle(hargaTerakhir);
       gambarGrafik();
+      robotPikir();
     })
     .catch(function () {
       setStatus("koneksi terganggu", "status-gagal");
@@ -217,6 +239,7 @@ function mulaiSimulasi() {
     });
   }
   hargaTerakhir = hargaSimulasi;
+  sinyalTerakhir = null;
   gambarGrafik();
   mulaiPembaruan();
 }
@@ -232,40 +255,47 @@ function perbaruiHargaSimulasi() {
   hargaTerakhir = hargaSimulasi;
   tanamHargaKeCandle(hargaTerakhir);
   gambarGrafik();
+  robotPikir();
 }
 
 
 /* ================= LOGIKA TRANSAKSI ================= */
 
-// Dipanggil saat tombol NAIK atau TURUN ditekan
-function mulaiTransaksi(arah) {
-  // Cegah transaksi ganda / tanpa harga / saldo kurang
+// asal = "manual" atau "robot"
+function mulaiTransaksi(arah, asal) {
   if (transaksiJalan !== null) { return; }
   if (hargaTerakhir === null) { return; }
-  if (saldo < nominal) { return; }
 
-  // Kunci nominal (saldo berkurang di depan)
-  saldo = saldo - nominal;
+  var jumlah = asal === "robot" ? robotNominal : nominal;
+  if (saldo < jumlah) {
+    if (asal === "robot") {
+      hentikanRobot("Saldo tidak cukup untuk nominal robot.");
+    }
+    return;
+  }
+
+  saldo = saldo - jumlah;
   gambarSaldo();
 
   transaksiJalan = {
-    arah: arah,                     // "naik" atau "turun"
-    nominal: nominal,
+    arah: arah,
+    nominal: jumlah,
+    asal: asal,
     hargaAwal: hargaTerakhir,
-    waktuSelesai: Date.now() + durasi * 1000
+    waktuSelesai: Date.now() + (asal === "robot" ? CONFIG.durasiRobot : durasi) * 1000
   };
 
   kunciTombol(true);
   el("kotak-jalan").className = "kotak-jalan";
   perbaruiInfoJalan();
 
-  // Hitung mundur tiap 1 detik
   pewaktuHitungMundur = setInterval(detikBerlalu, 1000);
 }
 
 function perbaruiInfoJalan() {
   var t = transaksiJalan;
   el("info-jalan").textContent =
+    (t.asal === "robot" ? "[ROBOT] " : "") +
     (t.arah === "naik" ? "▲ NAIK" : "▼ TURUN") +
     " · " + t.nominal +
     " · mulai " + formatHarga(t.hargaAwal);
@@ -279,7 +309,6 @@ function detikBerlalu() {
     return;
   }
 
-  // Waktu habis -> tutup transaksi
   clearInterval(pewaktuHitungMundur);
   pewaktuHitungMundur = null;
   tutupTransaksi();
@@ -295,19 +324,29 @@ function tutupTransaksi() {
   } else if (hargaAkhir < t.hargaAwal) {
     hasil = t.arah === "turun" ? "menang" : "kalah";
   } else {
-    hasil = "seri";   // harga tidak bergerak -> nominal kembali utuh
+    hasil = "seri";
   }
 
+  var untung = 0;
   if (hasil === "menang") {
-    saldo = saldo + t.nominal + t.nominal * CONFIG.persenMenang;
+    untung = t.nominal * CONFIG.persenMenang;
+    saldo = saldo + t.nominal + untung;
   } else if (hasil === "seri") {
     saldo = saldo + t.nominal;
+  } else {
+    untung = -t.nominal;
   }
-  // kalah: nominal tidak kembali
-
   gambarSaldo();
 
+  // Catat untuk robot (akumulasi harian)
+  if (t.asal === "robot") {
+    robotTransaksiHariIni++;
+    if (untung < 0) { robotRugiHariIni = robotRugiHariIni + Math.abs(untung); }
+    perbaruiInfoRobot();
+  }
+
   el("info-jalan").textContent =
+    (t.asal === "robot" ? "[ROBOT] " : "") +
     (t.arah === "naik" ? "▲ NAIK" : "▼ TURUN") +
     " · " + t.nominal +
     " · awal " + formatHarga(t.hargaAwal) +
@@ -319,9 +358,13 @@ function tutupTransaksi() {
 
   transaksiJalan = null;
   kunciTombol(false);
+
+  // Setelah transaksi robot selesai, cek rem pengaman
+  if (t.asal === "robot") {
+    cekRemPengaman();
+  }
 }
 
-// Aktifkan/matikan tombol arah sesuai keadaan
 function kunciTombol(sedangJalan) {
   var habis = saldo < nominalTerkecil();
   el("tombol-naik").disabled = sedangJalan || habis;
@@ -343,9 +386,8 @@ function gambarSaldo() {
 }
 
 
-/* ================= PILIHAN NOMINAL & DURASI ================= */
+/* ================= PILIHAN NOMINAL & DURASI (MANUAL) ================= */
 
-// Pasang perilaku klik pada satu grup tombol pilihan
 function pasangGrupPilih(idGrup, aksi) {
   var grup = el(idGrup);
   var tombolSemua = grup.getElementsByTagName("button");
@@ -363,6 +405,117 @@ function pasangGrupPilih(idGrup, aksi) {
   for (var i = 0; i < tombolSemua.length; i++) {
     pasang(i);
   }
+}
+
+
+/* ================= ROBOT: PERSILANGAN MOVING AVERAGE ================= */
+
+// Hitung rata-rata harga tutup sejumlah candle terakhir
+function hitungMA(jumlahCandleMA) {
+  if (candles.length < jumlahCandleMA) { return null; }
+  var total = 0;
+  for (var i = candles.length - jumlahCandleMA; i < candles.length; i++) {
+    total += candles[i].tutup;
+  }
+  return total / jumlahCandleMA;
+}
+
+// Tentukan posisi garis cepat terhadap garis lambat
+function sinyalSekarang() {
+  var cepat = hitungMA(CONFIG.maCepat);
+  var lambat = hitungMA(CONFIG.maLambat);
+  if (cepat === null || lambat === null) { return null; }
+  return cepat > lambat ? "naik" : cepat < lambat ? "turun" : null;
+}
+
+// "Otak" robot, dipanggil setiap ada harga baru
+function robotPikir() {
+  if (!robotHidup) { return; }
+  if (transaksiJalan !== null) { return; }   // tunggu transaksi sebelumnya selesai
+
+  resetHarianBilaPerlu();
+
+  var sinyal = sinyalSekarang();
+  if (sinyal === null) { return; }
+
+  // Hanya bertindak saat terjadi PERSILANGAN (posisi garis berubah)
+  if (sinyalTerakhir !== null && sinyal !== sinyalTerakhir) {
+    mulaiTransaksi(sinyal, "robot");
+  }
+  sinyalTerakhir = sinyal;
+}
+
+// Rem pengaman: berhenti bila batas tercapai
+function cekRemPengaman() {
+  if (!robotHidup) { return; }
+
+  if (robotRugiHariIni >= robotBatasRugi) {
+    hentikanRobot("Batas rugi harian tercapai (" + robotRugiHariIni + "). Robot berhenti.");
+  } else if (robotTransaksiHariIni >= robotBatasTransaksi) {
+    hentikanRobot("Batas jumlah transaksi tercapai (" + robotTransaksiHariIni + "x). Robot berhenti.");
+  }
+}
+
+// Reset penghitung harian kalau ganti tanggal
+function resetHarianBilaPerlu() {
+  var hariIni = tanggalHariIni();
+  if (hariIni !== robotTanggal) {
+    robotTanggal = hariIni;
+    robotRugiHariIni = 0;
+    robotTransaksiHariIni = 0;
+  }
+}
+
+function hidupkanRobot() {
+  // Baca pengaturan dari kotak isian
+  var n = parseInt(el("atur-nominal").value, 10);
+  var r = parseInt(el("atur-rugi").value, 10);
+  var t = parseInt(el("atur-transaksi").value, 10);
+
+  robotNominal = (isNaN(n) || n < 10) ? 50 : n;
+  robotBatasRugi = (isNaN(r) || r < 50) ? 500 : r;
+  robotBatasTransaksi = (isNaN(t) || t < 1) ? 10 : t;
+
+  resetHarianBilaPerlu();
+  robotHidup = true;
+  sinyalTerakhir = sinyalSekarang(); // catat posisi awal, tunggu persilangan
+
+  el("status-robot").textContent = "ON";
+  el("status-robot").className = "status-robot hidup";
+  el("tombol-robot").textContent = "MATIKAN";
+  el("tombol-robot").className = "tombol-robot matikan";
+  kunciKotakAtur(true);
+  perbaruiInfoRobot();
+}
+
+function hentikanRobot(alasan) {
+  robotHidup = false;
+
+  el("status-robot").textContent = "OFF";
+  el("status-robot").className = "status-robot mati";
+  el("tombol-robot").textContent = "HIDUPKAN";
+  el("tombol-robot").className = "tombol-robot";
+  kunciKotakAtur(false);
+
+  var info = el("info-robot");
+  info.textContent = "Robot mati. " + (alasan || "");
+  info.className = "info-robot";
+}
+
+function perbaruiInfoRobot() {
+  var info = el("info-robot");
+  info.textContent =
+    "Robot hidup · nominal " + robotNominal +
+    " · rugi hari ini " + robotRugiHariIni + "/" + robotBatasRugi +
+    " · transaksi " + robotTransaksiHariIni + "/" + robotBatasTransaksi +
+    " · menunggu persilangan garis rata-rata…";
+  info.className = "info-robot";
+}
+
+function kunciKotakAtur(terkunci) {
+  el("atur-nominal").disabled = terkunci;
+  el("atur-rugi").disabled = terkunci;
+  el("atur-transaksi").disabled = terkunci;
 }
 
 
@@ -402,7 +555,6 @@ function gambarGrafik() {
     if (candles[i].rendah < min) { min = candles[i].rendah; }
     if (candles[i].tinggi > max) { max = candles[i].tinggi; }
   }
-  // Pastikan harga awal transaksi ikut terlihat di grafik
   if (transaksiJalan !== null) {
     if (transaksiJalan.hargaAwal < min) { min = transaksiJalan.hargaAwal; }
     if (transaksiJalan.hargaAwal > max) { max = transaksiJalan.hargaAwal; }
@@ -416,7 +568,7 @@ function gambarGrafik() {
     return padAtas + (1 - (harga - min) / rentang) * tinggiArea;
   }
 
-  // Kisi mendatar + label harga
+  // Kisi + label harga
   ctx.font = "11px Arial";
   ctx.textBaseline = "middle";
   var jumlahGaris = 5;
@@ -435,7 +587,7 @@ function gambarGrafik() {
     ctx.fillText(formatHarga(hargaGaris), lebarArea + 6, yGaris);
   }
 
-  // Tiap candle
+  // Candle
   for (var c = 0; c < jumlah; c++) {
     var cd = candles[c];
     var x = Math.floor(c * slot + slot / 2);
@@ -456,6 +608,10 @@ function gambarGrafik() {
     ctx.fillStyle = warna;
     ctx.fillRect(x - lebarBadan / 2, yAtas, lebarBadan, tinggiBadan);
   }
+
+  // Gambar dua garis moving average (supaya persilangan terlihat)
+  gambarGarisMA(ctx, CONFIG.maCepat, "#f0b35e", yDariHarga, slot, lebarArea);  // emas = cepat
+  gambarGarisMA(ctx, CONFIG.maLambat, "#4da3ff", yDariHarga, slot, lebarArea); // biru = lambat
 
   // Label jam
   ctx.fillStyle = "#9aa4b8";
@@ -482,7 +638,7 @@ function gambarGrafik() {
     }
   }
 
-  // Garis harga awal transaksi (biru muda penuh)
+  // Garis harga awal transaksi (biru muda)
   if (transaksiJalan !== null) {
     var yAwal = yDariHarga(transaksiJalan.hargaAwal);
     if (yAwal >= padAtas && yAwal <= padAtas + tinggiArea) {
@@ -503,6 +659,36 @@ function gambarGrafik() {
   }
 }
 
+// Gambar satu garis rata-rata bergerak
+function gambarGarisMA(ctx, panjangMA, warna, yDariHarga, slot, lebarArea) {
+  if (candles.length < panjangMA) { return; }
+
+  ctx.strokeStyle = warna;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+
+  var pertama = true;
+  for (var i = panjangMA - 1; i < candles.length; i++) {
+    var total = 0;
+    for (var j = i - panjangMA + 1; j <= i; j++) {
+      total += candles[j].tutup;
+    }
+    var nilaiMA = total / panjangMA;
+    var x = i * slot + slot / 2;
+    var y = yDariHarga(nilaiMA);
+
+    if (x > lebarArea) { break; }
+    if (pertama) {
+      ctx.moveTo(x, y);
+      pertama = false;
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
+  ctx.stroke();
+  ctx.lineWidth = 1;
+}
+
 
 /* ================= TOMBOL TIMEFRAME ================= */
 
@@ -520,6 +706,7 @@ function gantiTimeframe(detik) {
   hargaTerakhir = null;
   modeSimulasi = false;
   hargaSimulasi = 81000;
+  sinyalTerakhir = null;
   setStatus("memuat…", "status-muat");
   gambarGrafik();
   ambilCandleAwal(0);
@@ -539,8 +726,16 @@ function mulaiPembaruan() {
 el("tf-1m").addEventListener("click", function () { gantiTimeframe(60); });
 el("tf-5m").addEventListener("click", function () { gantiTimeframe(300); });
 
-el("tombol-naik").addEventListener("click", function () { mulaiTransaksi("naik"); });
-el("tombol-turun").addEventListener("click", function () { mulaiTransaksi("turun"); });
+el("tombol-naik").addEventListener("click", function () { mulaiTransaksi("naik", "manual"); });
+el("tombol-turun").addEventListener("click", function () { mulaiTransaksi("turun", "manual"); });
+
+el("tombol-robot").addEventListener("click", function () {
+  if (robotHidup) {
+    hentikanRobot("Dimatikan oleh pengguna.");
+  } else {
+    hidupkanRobot();
+  }
+});
 
 pasangGrupPilih("grup-nominal", function (nilai) { nominal = nilai; });
 pasangGrupPilih("grup-durasi", function (nilai) { durasi = nilai; });
