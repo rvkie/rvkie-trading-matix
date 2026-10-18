@@ -32,9 +32,49 @@
     </div>
   </main>
 
-  <!-- ============ PANEL KONTROL (ISI MENYUSUL TAHAP 3) ============ -->
+  <!-- ============ PANEL KONTROL ============ -->
   <section class="panel-kontrol">
-    <p class="teks-halus">Panel kontrol (tombol Naik/Turun) menyusul di Tahap 3.</p>
+
+    <!-- Baris saldo -->
+    <div class="baris-saldo">
+      <span class="label-halus">Saldo Demo</span>
+      <span id="saldo" class="nilai-saldo">10,000</span>
+    </div>
+
+    <!-- Baris transaksi sedang berjalan (tersembunyi bila kosong) -->
+    <div id="kotak-jalan" class="kotak-jalan tersembunyi">
+      <span id="info-jalan" class="info-jalan">—</span>
+      <span id="hitung-mundur" class="hitung-mundur">—</span>
+    </div>
+
+    <!-- Pilihan nominal -->
+    <div class="grup-pilih">
+      <span class="label-halus">Nominal</span>
+      <div id="grup-nominal" class="baris-tombol-pilih">
+        <button class="tombol-pilih" data-nilai="10" type="button">10</button>
+        <button class="tombol-pilih aktif" data-nilai="50" type="button">50</button>
+        <button class="tombol-pilih" data-nilai="100" type="button">100</button>
+        <button class="tombol-pilih" data-nilai="250" type="button">250</button>
+      </div>
+    </div>
+
+    <!-- Pilihan durasi -->
+    <div class="grup-pilih">
+      <span class="label-halus">Durasi</span>
+      <div id="grup-durasi" class="baris-tombol-pilih">
+        <button class="tombol-pilih" data-nilai="30" type="button">30d</button>
+        <button class="tombol-pilih aktif" data-nilai="60" type="button">1m</button>
+        <button class="tombol-pilih" data-nilai="300" type="button">5m</button>
+      </div>
+    </div>
+
+    <!-- Tombol arah -->
+    <div class="baris-arah">
+      <button id="tombol-naik" class="tombol-arah naik" type="button">▲ NAIK</button>
+      <button id="tombol-turun" class="tombol-arah turun" type="button">▼ TURUN</button>
+    </div>
+
+    <p class="teks-halus">Menang: +80% nominal &middot; Kalah: &minus;nominal</p>
   </section>
 
   <!-- ============ DISCLAIMER ============ -->
