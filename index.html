@@ -42,7 +42,6 @@
       <button id="tombol-robot" class="tombol-robot" type="button">HIDUPKAN</button>
     </div>
 
-    <!-- Pengaturan robot -->
     <div class="robot-atur">
       <div class="grup-atur">
         <label class="label-halus" for="atur-nominal">Nominal</label>
@@ -103,6 +102,32 @@
     </div>
 
     <p class="teks-halus">Menang: +80% nominal &middot; Kalah: &minus;nominal</p>
+  </section>
+
+  <!-- ============ RIWAYAT & STATISTIK ============ -->
+  <section class="panel-riwayat">
+    <div class="baris-statistik">
+      <div class="kotak-stat menang">
+        <span id="stat-menang" class="angka-stat">0</span>
+        <span class="label-stat">Menang</span>
+      </div>
+      <div class="kotak-stat kalah">
+        <span id="stat-kalah" class="angka-stat">0</span>
+        <span class="label-stat">Kalah</span>
+      </div>
+      <div class="kotak-stat seri">
+        <span id="stat-seri" class="angka-stat">0</span>
+        <span class="label-stat">Seri</span>
+      </div>
+      <div class="kotak-stat persen">
+        <span id="stat-persen" class="angka-stat">—</span>
+        <span class="label-stat">Menang %</span>
+      </div>
+    </div>
+
+    <div id="daftar-riwayat" class="daftar-riwayat">
+      <p class="teks-halus">Belum ada transaksi.</p>
+    </div>
   </section>
 
   <!-- ============ DISCLAIMER ============ -->
