@@ -86,11 +86,9 @@ body {
 
 /* ---------- Area grafik ---------- */
 .area-grafik {
-  flex: 1;
   display: flex;
   flex-direction: column;
   padding: 10px 12px;
-  min-height: 0;
 }
 
 .toolbar {
@@ -117,8 +115,7 @@ body {
 }
 
 .kotak-grafik {
-  flex: 1;
-  min-height: 300px;
+  height: 320px;
   background: #131927;
   border: 1px solid #242e45;
   border-radius: 8px;
@@ -179,7 +176,7 @@ body {
   color: #ffffff;
 }
 
-/* Baris pengaturan robot (membungkus jadi 2 per baris di layar sempit) */
+/* Baris pengaturan robot */
 .robot-atur {
   display: flex;
   flex-wrap: wrap;
@@ -339,6 +336,84 @@ body {
   color: #5a6478;
   cursor: not-allowed;
 }
+
+/* ---------- Riwayat & statistik ---------- */
+.panel-riwayat {
+  padding: 12px 16px;
+  background: #171e2e;
+  border-top: 1px solid #242e45;
+}
+
+.baris-statistik {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.kotak-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  background: #131927;
+  border: 1px solid #242e45;
+  border-radius: 8px;
+}
+
+.angka-stat {
+  font-size: 18px;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
+
+.kotak-stat.menang .angka-stat { color: #2ebd85; }
+.kotak-stat.kalah  .angka-stat { color: #f6465d; }
+.kotak-stat.seri   .angka-stat { color: #9aa4b8; }
+.kotak-stat.persen .angka-stat { color: #f0b35e; }
+
+.label-stat {
+  font-size: 11px;
+  color: #9aa4b8;
+}
+
+.daftar-riwayat {
+  max-height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.item-riwayat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  background: #131927;
+  border-radius: 6px;
+  border-left: 3px solid #242e45;
+  font-size: 12px;
+}
+
+.item-riwayat.menang { border-left-color: #2ebd85; }
+.item-riwayat.kalah  { border-left-color: #f6465d; }
+.item-riwayat.seri   { border-left-color: #5a6478; }
+
+.riwayat-kiri {
+  color: #9aa4b8;
+}
+
+.riwayat-kanan {
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
+
+.item-riwayat.menang .riwayat-kanan { color: #2ebd85; }
+.item-riwayat.kalah  .riwayat-kanan { color: #f6465d; }
+.item-riwayat.seri   .riwayat-kanan { color: #9aa4b8; }
 
 /* ---------- Disclaimer ---------- */
 .disclaimer {
