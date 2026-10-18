@@ -16,6 +16,10 @@ body {
   font-family: Arial, sans-serif;
 }
 
+.tersembunyi {
+  display: none !important;
+}
+
 /* ---------- Kepala aplikasi ---------- */
 .topbar {
   display: flex;
@@ -130,16 +134,125 @@ body {
 
 /* ---------- Panel kontrol ---------- */
 .panel-kontrol {
-  padding: 14px 16px;
+  padding: 12px 16px;
   background: #171e2e;
   border-top: 1px solid #242e45;
-  text-align: center;
+}
+
+.label-halus {
+  color: #9aa4b8;
+  font-size: 12px;
 }
 
 .teks-halus {
   color: #9aa4b8;
+  font-size: 12px;
+  margin: 8px 0 0;
+  text-align: center;
+}
+
+/* Baris saldo */
+.baris-saldo {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.nilai-saldo {
+  font-size: 24px;
+  font-weight: bold;
+  color: #f0b35e;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Info transaksi sedang berjalan */
+.kotak-jalan {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  background: #131927;
+  border: 1px solid #f0b35e;
+  border-radius: 8px;
+}
+
+.info-jalan {
   font-size: 13px;
-  margin: 0;
+  color: #e8ecf4;
+}
+
+.hitung-mundur {
+  font-size: 18px;
+  font-weight: bold;
+  color: #f0b35e;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Grup pilihan nominal / durasi */
+.grup-pilih {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.grup-pilih .label-halus {
+  width: 56px;
+  flex-shrink: 0;
+}
+
+.baris-tombol-pilih {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+
+.tombol-pilih {
+  flex: 1;
+  padding: 10px 4px;
+  font-size: 14px;
+  background: #131927;
+  color: #9aa4b8;
+  border: 1px solid #242e45;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tombol-pilih.aktif {
+  background: #242e45;
+  color: #f0b35e;
+  border-color: #f0b35e;
+  font-weight: bold;
+}
+
+/* Tombol arah Naik / Turun */
+.baris-arah {
+  display: flex;
+  gap: 10px;
+}
+
+.tombol-arah {
+  flex: 1;
+  padding: 16px 4px;
+  font-size: 18px;
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #0f1420;
+}
+
+.tombol-arah.naik  { background: #2ebd85; }
+.tombol-arah.turun { background: #f6465d; color: #ffffff; }
+
+.tombol-arah:disabled {
+  background: #242e45;
+  color: #5a6478;
+  cursor: not-allowed;
 }
 
 /* ---------- Disclaimer ---------- */
