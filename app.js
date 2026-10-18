@@ -1,15 +1,15 @@
 /* ============================================================
    RTM (Rvkie Trading Matix) — Otak aplikasi
-   Tahap 2: grafik candlestick realtime, harga asli BTC-USD
-   Sumber utama: Coinbase  -> cadangan: Binance -> simulasi
+   Tahap 2: grafik candlestick realtime (Coinbase -> Binance -> simulasi)
+   Tahap 3: saldo virtual 10.000 + tombol Naik/Turun + nominal & durasi
    ------------------------------------------------------------
-   Cara kerja singkat (untuk dibaca pemula):
-   - "Candle" = satu batang grafik berisi harga pembukaan,
-     tertinggi, terendah, dan penutupan dalam satu periode.
-   - Aplikasi mengambil ratusan candle terakhir dari internet,
-     menggambarnya di kanvas, lalu memperbarui candle yang
-     sedang berjalan setiap 3 detik.
-   - Mode demo penuh: tidak ada uang asli yang dipakai.
+   Untuk pemula:
+   - "Candle" = satu batang grafik (harga buka, tertinggi,
+     terendah, tutup dalam satu periode).
+   - "Transaksi" = kamu memilih arah (Naik/Turun), nominal, dan
+     durasi; saat durasi habis, harga akhir dibandingkan dengan
+     harga awal untuk menentukan menang/kalah.
+   - Mode demo penuh: saldo hanyalah angka di layar, bukan uang.
    ============================================================ */
 
 
@@ -18,14 +18,16 @@
 var CONFIG = {
   jumlahCandle: 200,        // berapa candle terakhir yang diambil
   intervalAmbilMs: 3000,    // jarak pembaruan harga (3 detik)
-  timeframe: 60             // 60 = 1 menit, 300 = 5 menit (detik)
+  timeframe: 60,            // 60 = 1 menit, 300 = 5 menit (detik)
+
+  saldoAwal: 10000,         // saldo demo awal
+  persenMenang: 0.8         // menang = +80% dari nominal
 };
 
 // Daftar sumber data, dicoba berurutan sampai ada yang berhasil
 var SUMBER = [
   {
     nama: "Coinbase",
-    pasangan: "BTC-USD",
     urlCandle: function (tf) {
       return "https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=" + tf;
     },
@@ -44,7 +46,6 @@ var SUMBER = [
   },
   {
     nama: "Binance",
-    pasangan: "BTCUSDT",
     urlCandle: function (tf) {
       var kode = tf === 300 ? "5m" : "1m";
       return "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=" + kode + "&limit=" + CONFIG.jumlahCandle;
@@ -78,7 +79,13 @@ var hargaTerakhir = null;    // harga pasar terbaru
 var sumberAktif = null;      // objek sumber yang sedang dipakai
 var modeSimulasi = false;    // true jika semua sumber gagal
 var hargaSimulasi = 81000;   // titik awal harga simulasi
-var pewaktu = null;          // penanda interval pembaruan
+var pewaktu = null;          // penanda interval pembaruan harga
+
+var saldo = CONFIG.saldoAwal;   // saldo demo
+var nominal = 50;               // nominal taruhan terpilih
+var durasi = 60;                // durasi transaksi terpilih (detik)
+var transaksiJalan = null;      // transaksi aktif, null jika tidak ada
+var pewaktuHitungMundur = null; // penanda interval hitung mundur
 
 
 /* ================= ALAT BANTU ================= */
@@ -87,7 +94,7 @@ function el(id) {
   return document.getElementById(id);
 }
 
-// Ubah angka jadi teks rapi: 81164.5 -> "81,164.50"
+// 81164.5 -> "81,164.50"
 function formatHarga(angka) {
   return angka.toLocaleString("en-US", {
     minimumFractionDigits: 2,
@@ -95,7 +102,11 @@ function formatHarga(angka) {
   });
 }
 
-// Atur lencana status di pojok kanan atas
+// 10000 -> "10,000"
+function formatSaldo(angka) {
+  return angka.toLocaleString("en-US", { maximumFractionDigits: 0 });
+}
+
 function setStatus(teks, kelas) {
   var s = el("status-koneksi");
   s.textContent = teks;
@@ -103,9 +114,8 @@ function setStatus(teks, kelas) {
 }
 
 
-/* ================= MENGAMBIL DATA ================= */
+/* ================= MENGAMBIL DATA HARGA ================= */
 
-// Ambil candle awal dari sumber nomor urut (0 = Coinbase, 1 = Binance)
 function ambilCandleAwal(nomorSumber) {
   if (nomorSumber >= SUMBER.length) {
     mulaiSimulasi();
@@ -121,7 +131,7 @@ function ambilCandleAwal(nomorSumber) {
     })
     .then(function (mentah) {
       var daftar = sumber.uraikanCandle(mentah);
-      daftar.sort(function (a, b) { return a.waktu - b.waktu; }); // urut lama -> baru
+      daftar.sort(function (a, b) { return a.waktu - b.waktu; });
       candles = daftar;
       sumberAktif = sumber;
       modeSimulasi = false;
@@ -131,13 +141,11 @@ function ambilCandleAwal(nomorSumber) {
       mulaiPembaruan();
     })
     .catch(function () {
-      // Sumber ini gagal, coba sumber berikutnya
       setStatus("mencoba sumber lain…", "status-muat");
       ambilCandleAwal(nomorSumber + 1);
     });
 }
 
-// Ambil harga terbaru dan perbarui candle yang sedang berjalan
 function perbaruiHarga() {
   if (modeSimulasi) {
     perbaruiHargaSimulasi();
@@ -160,16 +168,14 @@ function perbaruiHarga() {
     });
 }
 
-// Masukkan harga terbaru ke candle periode sekarang
 function tanamHargaKeCandle(harga) {
   if (candles.length === 0) { return; }
 
   var tf = CONFIG.timeframe;
-  var waktuSekarang = Math.floor(Date.now() / 1000 / tf) * tf; // awal periode
+  var waktuSekarang = Math.floor(Date.now() / 1000 / tf) * tf;
   var candleTerakhir = candles[candles.length - 1];
 
   if (candleTerakhir.waktu < waktuSekarang) {
-    // Periode baru dimulai -> buat candle baru
     candles.push({
       waktu: waktuSekarang,
       buka: candleTerakhir.tutup,
@@ -178,10 +184,9 @@ function tanamHargaKeCandle(harga) {
       tutup: harga
     });
     if (candles.length > CONFIG.jumlahCandle) {
-      candles.shift(); // buang candle paling tua
+      candles.shift();
     }
   } else {
-    // Masih periode yang sama -> perbarui candle berjalan
     candleTerakhir.tutup = harga;
     if (harga > candleTerakhir.tinggi) { candleTerakhir.tinggi = harga; }
     if (harga < candleTerakhir.rendah) { candleTerakhir.rendah = harga; }
@@ -189,14 +194,13 @@ function tanamHargaKeCandle(harga) {
 }
 
 
-/* ================= MODE SIMULASI (CADANGAN TERAKHIR) ================= */
+/* ================= MODE SIMULASI ================= */
 
 function mulaiSimulasi() {
   modeSimulasi = true;
   sumberAktif = null;
   setStatus("mode simulasi (offline)", "status-muat");
 
-  // Bangun riwayat candle palsu yang tetap terlihat wajar
   candles = [];
   var tf = CONFIG.timeframe;
   var waktuSekarang = Math.floor(Date.now() / 1000 / tf) * tf;
@@ -217,7 +221,6 @@ function mulaiSimulasi() {
   mulaiPembaruan();
 }
 
-// Gerak acak kecil supaya grafik simulasi tampak hidup
 function gerakkanHargaSimulasi() {
   var arah = Math.random() < 0.5 ? -1 : 1;
   var besar = Math.random() * 40;
@@ -232,6 +235,137 @@ function perbaruiHargaSimulasi() {
 }
 
 
+/* ================= LOGIKA TRANSAKSI ================= */
+
+// Dipanggil saat tombol NAIK atau TURUN ditekan
+function mulaiTransaksi(arah) {
+  // Cegah transaksi ganda / tanpa harga / saldo kurang
+  if (transaksiJalan !== null) { return; }
+  if (hargaTerakhir === null) { return; }
+  if (saldo < nominal) { return; }
+
+  // Kunci nominal (saldo berkurang di depan)
+  saldo = saldo - nominal;
+  gambarSaldo();
+
+  transaksiJalan = {
+    arah: arah,                     // "naik" atau "turun"
+    nominal: nominal,
+    hargaAwal: hargaTerakhir,
+    waktuSelesai: Date.now() + durasi * 1000
+  };
+
+  kunciTombol(true);
+  el("kotak-jalan").className = "kotak-jalan";
+  perbaruiInfoJalan();
+
+  // Hitung mundur tiap 1 detik
+  pewaktuHitungMundur = setInterval(detikBerlalu, 1000);
+}
+
+function perbaruiInfoJalan() {
+  var t = transaksiJalan;
+  el("info-jalan").textContent =
+    (t.arah === "naik" ? "▲ NAIK" : "▼ TURUN") +
+    " · " + t.nominal +
+    " · mulai " + formatHarga(t.hargaAwal);
+}
+
+function detikBerlalu() {
+  var sisa = Math.ceil((transaksiJalan.waktuSelesai - Date.now()) / 1000);
+
+  if (sisa > 0) {
+    el("hitung-mundur").textContent = sisa + "d";
+    return;
+  }
+
+  // Waktu habis -> tutup transaksi
+  clearInterval(pewaktuHitungMundur);
+  pewaktuHitungMundur = null;
+  tutupTransaksi();
+}
+
+function tutupTransaksi() {
+  var t = transaksiJalan;
+  var hargaAkhir = hargaTerakhir;
+  var hasil;
+
+  if (hargaAkhir > t.hargaAwal) {
+    hasil = t.arah === "naik" ? "menang" : "kalah";
+  } else if (hargaAkhir < t.hargaAwal) {
+    hasil = t.arah === "turun" ? "menang" : "kalah";
+  } else {
+    hasil = "seri";   // harga tidak bergerak -> nominal kembali utuh
+  }
+
+  if (hasil === "menang") {
+    saldo = saldo + t.nominal + t.nominal * CONFIG.persenMenang;
+  } else if (hasil === "seri") {
+    saldo = saldo + t.nominal;
+  }
+  // kalah: nominal tidak kembali
+
+  gambarSaldo();
+
+  el("info-jalan").textContent =
+    (t.arah === "naik" ? "▲ NAIK" : "▼ TURUN") +
+    " · " + t.nominal +
+    " · awal " + formatHarga(t.hargaAwal) +
+    " · akhir " + formatHarga(hargaAkhir) +
+    " · " + (hasil === "menang" ? "MENANG +" + (t.nominal * CONFIG.persenMenang)
+            : hasil === "kalah" ? "KALAH -" + t.nominal
+            : "SERI");
+  el("hitung-mundur").textContent = hasil === "menang" ? "✔" : hasil === "kalah" ? "✖" : "=";
+
+  transaksiJalan = null;
+  kunciTombol(false);
+}
+
+// Aktifkan/matikan tombol arah sesuai keadaan
+function kunciTombol(sedangJalan) {
+  var habis = saldo < nominalTerkecil();
+  el("tombol-naik").disabled = sedangJalan || habis;
+  el("tombol-turun").disabled = sedangJalan || habis;
+}
+
+function nominalTerkecil() {
+  var tombolNominal = el("grup-nominal").getElementsByTagName("button");
+  var terkecil = Infinity;
+  for (var i = 0; i < tombolNominal.length; i++) {
+    var nilai = parseInt(tombolNominal[i].getAttribute("data-nilai"), 10);
+    if (nilai < terkecil) { terkecil = nilai; }
+  }
+  return terkecil;
+}
+
+function gambarSaldo() {
+  el("saldo").textContent = formatSaldo(saldo);
+}
+
+
+/* ================= PILIHAN NOMINAL & DURASI ================= */
+
+// Pasang perilaku klik pada satu grup tombol pilihan
+function pasangGrupPilih(idGrup, aksi) {
+  var grup = el(idGrup);
+  var tombolSemua = grup.getElementsByTagName("button");
+
+  var pasang = function (i) {
+    tombolSemua[i].addEventListener("click", function () {
+      for (var j = 0; j < tombolSemua.length; j++) {
+        tombolSemua[j].className = "tombol-pilih";
+      }
+      tombolSemua[i].className = "tombol-pilih aktif";
+      aksi(parseInt(tombolSemua[i].getAttribute("data-nilai"), 10));
+    });
+  };
+
+  for (var i = 0; i < tombolSemua.length; i++) {
+    pasang(i);
+  }
+}
+
+
 /* ================= MENGGAMBAR GRAFIK ================= */
 
 function gambarGrafik() {
@@ -240,7 +374,6 @@ function gambarGrafik() {
   var lebar = kotak.clientWidth;
   var tinggi = kotak.clientHeight;
 
-  // Sesuaikan ketajaman dengan layar (HP layar tajam butuh skala)
   var skala = window.devicePixelRatio || 1;
   kanvas.width = lebar * skala;
   kanvas.height = tinggi * skala;
@@ -248,40 +381,42 @@ function gambarGrafik() {
   var ctx = kanvas.getContext("2d");
   ctx.setTransform(skala, 0, 0, skala, 0, 0);
 
-  // Latar
   ctx.fillStyle = "#131927";
   ctx.fillRect(0, 0, lebar, tinggi);
 
   if (candles.length === 0) { return; }
 
   var padAtas = 14;
-  var padBawah = 24;   // ruang untuk label jam
-  var padKanan = 62;   // ruang untuk label harga
+  var padBawah = 24;
+  var padKanan = 62;
   var lebarArea = lebar - padKanan;
   var tinggiArea = tinggi - padAtas - padBawah;
 
   var jumlah = candles.length;
-  var slot = lebarArea / jumlah;                 // ruang per candle
+  var slot = lebarArea / jumlah;
   var lebarBadan = Math.max(2, Math.floor(slot * 0.6));
 
-  // Cari harga tertinggi & terendah yang terlihat
   var min = Infinity;
   var max = -Infinity;
   for (var i = 0; i < jumlah; i++) {
     if (candles[i].rendah < min) { min = candles[i].rendah; }
     if (candles[i].tinggi > max) { max = candles[i].tinggi; }
   }
+  // Pastikan harga awal transaksi ikut terlihat di grafik
+  if (transaksiJalan !== null) {
+    if (transaksiJalan.hargaAwal < min) { min = transaksiJalan.hargaAwal; }
+    if (transaksiJalan.hargaAwal > max) { max = transaksiJalan.hargaAwal; }
+  }
   var rentang = (max - min) || 1;
-  min -= rentang * 0.05;   // beri napas atas-bawah
+  min -= rentang * 0.05;
   max += rentang * 0.05;
   rentang = max - min;
 
-  // Ubah harga menjadi posisi vertikal (semakin mahal, semakin ke atas)
   function yDariHarga(harga) {
     return padAtas + (1 - (harga - min) / rentang) * tinggiArea;
   }
 
-  // Garis-garis kisi mendatar + label harga di kanan
+  // Kisi mendatar + label harga
   ctx.font = "11px Arial";
   ctx.textBaseline = "middle";
   var jumlahGaris = 5;
@@ -300,21 +435,19 @@ function gambarGrafik() {
     ctx.fillText(formatHarga(hargaGaris), lebarArea + 6, yGaris);
   }
 
-  // Gambar tiap candle
+  // Tiap candle
   for (var c = 0; c < jumlah; c++) {
     var cd = candles[c];
     var x = Math.floor(c * slot + slot / 2);
     var naik = cd.tutup >= cd.buka;
     var warna = naik ? "#2ebd85" : "#f6465d";
 
-    // Sumbu (garis tipis tertinggi-terendah)
     ctx.strokeStyle = warna;
     ctx.beginPath();
     ctx.moveTo(x, yDariHarga(cd.tinggi));
     ctx.lineTo(x, yDariHarga(cd.rendah));
     ctx.stroke();
 
-    // Badan (kotak buka-tutup)
     var yBuka = yDariHarga(cd.buka);
     var yTutup = yDariHarga(cd.tutup);
     var yAtas = Math.min(yBuka, yTutup);
@@ -324,7 +457,7 @@ function gambarGrafik() {
     ctx.fillRect(x - lebarBadan / 2, yAtas, lebarBadan, tinggiBadan);
   }
 
-  // Label jam untuk beberapa candle di bagian bawah
+  // Label jam
   ctx.fillStyle = "#9aa4b8";
   ctx.textAlign = "center";
   var loncat = Math.ceil(jumlah / 6);
@@ -335,7 +468,7 @@ function gambarGrafik() {
     ctx.fillText(jam + ":" + menit, t * slot + slot / 2, tinggi - 10);
   }
 
-  // Garis putus-putus pada harga terakhir
+  // Garis harga terakhir (emas putus-putus)
   if (hargaTerakhir !== null) {
     var yTerakhir = yDariHarga(hargaTerakhir);
     if (yTerakhir >= padAtas && yTerakhir <= padAtas + tinggiArea) {
@@ -349,7 +482,19 @@ function gambarGrafik() {
     }
   }
 
-  // Perbarui teks harga di kepala aplikasi
+  // Garis harga awal transaksi (biru muda penuh)
+  if (transaksiJalan !== null) {
+    var yAwal = yDariHarga(transaksiJalan.hargaAwal);
+    if (yAwal >= padAtas && yAwal <= padAtas + tinggiArea) {
+      ctx.strokeStyle = "#4da3ff";
+      ctx.beginPath();
+      ctx.moveTo(0, yAwal);
+      ctx.lineTo(lebarArea, yAwal);
+      ctx.stroke();
+    }
+  }
+
+  // Teks harga di kepala
   var teksHarga = el("harga-sekarang");
   if (candles.length > 0 && hargaTerakhir !== null) {
     var pembuka = candles[candles.length - 1].buka;
@@ -361,14 +506,12 @@ function gambarGrafik() {
 
 /* ================= TOMBOL TIMEFRAME ================= */
 
-function gantiTimeframe(detik, idTombol) {
+function gantiTimeframe(detik) {
   CONFIG.timeframe = detik;
 
-  // Tandai tombol yang aktif
   el("tf-1m").className = "tombol-tf" + (detik === 60 ? " aktif" : "");
   el("tf-5m").className = "tombol-tf" + (detik === 300 ? " aktif" : "");
 
-  // Hentikan pembaruan lama, ambil ulang data sesuai timeframe baru
   if (pewaktu !== null) {
     clearInterval(pewaktu);
     pewaktu = null;
@@ -393,9 +536,16 @@ function mulaiPembaruan() {
 
 /* ================= SAAT HALAMAN DIBUKA ================= */
 
-el("tf-1m").addEventListener("click", function () { gantiTimeframe(60, "tf-1m"); });
-el("tf-5m").addEventListener("click", function () { gantiTimeframe(300, "tf-5m"); });
+el("tf-1m").addEventListener("click", function () { gantiTimeframe(60); });
+el("tf-5m").addEventListener("click", function () { gantiTimeframe(300); });
+
+el("tombol-naik").addEventListener("click", function () { mulaiTransaksi("naik"); });
+el("tombol-turun").addEventListener("click", function () { mulaiTransaksi("turun"); });
+
+pasangGrupPilih("grup-nominal", function (nilai) { nominal = nilai; });
+pasangGrupPilih("grup-durasi", function (nilai) { durasi = nilai; });
 
 window.addEventListener("resize", gambarGrafik);
 
+gambarSaldo();
 ambilCandleAwal(0);
