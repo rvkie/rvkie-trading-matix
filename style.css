@@ -1,0 +1,153 @@
+/* ============================================================
+   RTM (Rvkie Trading Matix) — Tampilan tema gelap
+   ============================================================ */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #0f1420;
+  color: #e8ecf4;
+  font-family: Arial, sans-serif;
+}
+
+/* ---------- Kepala aplikasi ---------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: #171e2e;
+  border-bottom: 1px solid #242e45;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.brand-nama {
+  font-size: 20px;
+  font-weight: bold;
+  color: #f0b35e;
+  letter-spacing: 1px;
+}
+
+.brand-sub {
+  font-size: 11px;
+  color: #9aa4b8;
+}
+
+.aset {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.aset-pasangan {
+  font-size: 14px;
+  color: #9aa4b8;
+}
+
+.aset-harga {
+  font-size: 18px;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
+
+.aset-harga.naik { color: #2ebd85; }
+.aset-harga.turun { color: #f6465d; }
+
+/* Lencana status koneksi */
+.status {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: #242e45;
+  color: #9aa4b8;
+}
+
+.status-live  { background: rgba(46, 189, 133, 0.15); color: #2ebd85; }
+.status-muat  { background: rgba(240, 179, 94, 0.15); color: #f0b35e; }
+.status-gagal { background: rgba(246, 70, 93, 0.15);  color: #f6465d; }
+
+/* ---------- Area grafik ---------- */
+.area-grafik {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  min-height: 0;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.tombol-tf {
+  padding: 8px 18px;
+  font-size: 14px;
+  background: #171e2e;
+  color: #9aa4b8;
+  border: 1px solid #242e45;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tombol-tf.aktif {
+  background: #f0b35e;
+  color: #0f1420;
+  border-color: #f0b35e;
+  font-weight: bold;
+}
+
+.kotak-grafik {
+  flex: 1;
+  min-height: 300px;
+  background: #131927;
+  border: 1px solid #242e45;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+#grafik {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- Panel kontrol ---------- */
+.panel-kontrol {
+  padding: 14px 16px;
+  background: #171e2e;
+  border-top: 1px solid #242e45;
+  text-align: center;
+}
+
+.teks-halus {
+  color: #9aa4b8;
+  font-size: 13px;
+  margin: 0;
+}
+
+/* ---------- Disclaimer ---------- */
+.disclaimer {
+  padding: 10px;
+  background: #171e2e;
+  border-top: 1px solid #242e45;
+  color: #f0b35e;
+  font-size: 13px;
+  text-align: center;
+}
