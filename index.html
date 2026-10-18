@@ -32,22 +32,48 @@
     </div>
   </main>
 
-  <!-- ============ PANEL KONTROL ============ -->
+  <!-- ============ PANEL ROBOT ============ -->
+  <section class="panel-robot">
+    <div class="baris-robot-atas">
+      <div class="robot-kiri">
+        <span class="label-halus">Robot Otomatis</span>
+        <span id="status-robot" class="status-robot mati">OFF</span>
+      </div>
+      <button id="tombol-robot" class="tombol-robot" type="button">HIDUPKAN</button>
+    </div>
+
+    <!-- Pengaturan robot -->
+    <div class="robot-atur">
+      <div class="grup-atur">
+        <label class="label-halus" for="atur-nominal">Nominal</label>
+        <input id="atur-nominal" class="kotak-isi" type="number" min="10" step="10" value="50">
+      </div>
+      <div class="grup-atur">
+        <label class="label-halus" for="atur-rugi">Batas rugi/hari</label>
+        <input id="atur-rugi" class="kotak-isi" type="number" min="50" step="50" value="500">
+      </div>
+      <div class="grup-atur">
+        <label class="label-halus" for="atur-transaksi">Batas transaksi</label>
+        <input id="atur-transaksi" class="kotak-isi" type="number" min="1" step="1" value="10">
+      </div>
+    </div>
+
+    <p id="info-robot" class="info-robot">Robot mati. Atur nominal, batas rugi, dan batas transaksi, lalu tekan HIDUPKAN.</p>
+  </section>
+
+  <!-- ============ PANEL KONTROL MANUAL ============ -->
   <section class="panel-kontrol">
 
-    <!-- Baris saldo -->
     <div class="baris-saldo">
       <span class="label-halus">Saldo Demo</span>
       <span id="saldo" class="nilai-saldo">10,000</span>
     </div>
 
-    <!-- Baris transaksi sedang berjalan (tersembunyi bila kosong) -->
     <div id="kotak-jalan" class="kotak-jalan tersembunyi">
       <span id="info-jalan" class="info-jalan">—</span>
       <span id="hitung-mundur" class="hitung-mundur">—</span>
     </div>
 
-    <!-- Pilihan nominal -->
     <div class="grup-pilih">
       <span class="label-halus">Nominal</span>
       <div id="grup-nominal" class="baris-tombol-pilih">
@@ -58,7 +84,6 @@
       </div>
     </div>
 
-    <!-- Pilihan durasi -->
     <div class="grup-pilih">
       <span class="label-halus">Durasi</span>
       <div id="grup-durasi" class="baris-tombol-pilih">
@@ -68,7 +93,6 @@
       </div>
     </div>
 
-    <!-- Tombol arah -->
     <div class="baris-arah">
       <button id="tombol-naik" class="tombol-arah naik" type="button">▲ NAIK</button>
       <button id="tombol-turun" class="tombol-arah turun" type="button">▼ TURUN</button>
